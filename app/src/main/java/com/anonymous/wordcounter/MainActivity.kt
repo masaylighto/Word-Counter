@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -126,7 +125,6 @@ private fun BlossomTheme(content: @Composable () -> Unit) {
 private fun WordCounterApp(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val words by viewModel.words.collectAsStateWithLifecycle()
-    val stats by viewModel.stats.collectAsStateWithLifecycle()
     var page by rememberSaveable { mutableStateOf(0) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -143,11 +141,6 @@ private fun WordCounterApp(viewModel: MainViewModel = viewModel()) {
                     .fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                HeroCard(
-                    uniqueWords = stats.first,
-                    totalOccurrences = stats.second,
-                )
-
                 PageSwitcher(
                     page = page,
                     onPageChange = { page = it },
@@ -187,62 +180,19 @@ private fun WordCounterApp(viewModel: MainViewModel = viewModel()) {
                         modifier = Modifier.weight(1f),
                     )
                 }
-
-                StatusStrip(
-                    statusText = uiState.statusText,
-                    errorText = uiState.errorText,
-                )
             }
         }
     }
 }
 
 @Composable
-private fun HeroCard(uniqueWords: Int, totalOccurrences: Int) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.93f),
-        tonalElevation = 5.dp,
-        shadowElevation = 10.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                text = "Bloom Lexicon",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                text = "Track German vocabulary with a soft, floral look.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MetricChip(label = "Unique", value = uniqueWords.toString())
-                MetricChip(label = "Total", value = totalOccurrences.toString())
-            }
-        }
-    }
-}
-
-@Composable
-private fun MetricChip(label: String, value: String) {
-    Surface(
-        shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
-            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-        }
-    }
+private fun ScrollHeaderTitle() {
+    Text(
+        text = "Bloom Lexicon",
+        style = MaterialTheme.typography.headlineMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = 4.dp),
+    )
 }
 
 @Composable
@@ -332,6 +282,10 @@ private fun WordsPage(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(bottom = 6.dp),
     ) {
+        item {
+            ScrollHeaderTitle()
+        }
+
         item {
             SoftCard {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -758,6 +712,8 @@ private fun SettingsPage(
             .verticalScroll(scroll),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        ScrollHeaderTitle()
+
         SoftCard {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("AI Settings", style = MaterialTheme.typography.titleLarge)
@@ -816,37 +772,6 @@ private fun SettingsPage(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-    }
-}
-
-@Composable
-private fun StatusStrip(statusText: String, errorText: String) {
-    val isError = errorText.isNotBlank()
-    val container = if (isError) {
-        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.95f)
-    } else {
-        MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
-    }
-    val contentColor = if (isError) {
-        MaterialTheme.colorScheme.onErrorContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .wrapContentHeight(),
-        shape = RoundedCornerShape(18.dp),
-        color = container,
-        tonalElevation = 2.dp,
-    ) {
-        Text(
-            text = if (isError) errorText else statusText,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = contentColor,
-        )
     }
 }
 
