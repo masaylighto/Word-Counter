@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.anonymous.wordcounter.data.WordEntity
+import com.anonymous.wordcounter.ui.DefinitionLanguage
 import com.anonymous.wordcounter.ui.MainViewModel
 import com.anonymous.wordcounter.ui.SortMethod
 import java.text.SimpleDateFormat
@@ -126,6 +127,7 @@ private fun WordCounterApp(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val words by viewModel.words.collectAsStateWithLifecycle()
     var page by rememberSaveable { mutableStateOf(0) }
+    var showPageSwitcher by rememberSaveable { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         FloralBackground(modifier = Modifier.fillMaxSize())
@@ -141,10 +143,20 @@ private fun WordCounterApp(viewModel: MainViewModel = viewModel()) {
                     .fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                PageSwitcher(
-                    page = page,
-                    onPageChange = { page = it },
+                TopHeader(
+                    pageSwitcherVisible = showPageSwitcher,
+                    onTogglePageSwitcher = { showPageSwitcher = !showPageSwitcher },
                 )
+
+                if (showPageSwitcher) {
+                    PageSwitcher(
+                        page = page,
+                        onPageChange = {
+                            page = it
+                            showPageSwitcher = false
+                        },
+                    )
+                }
 
                 if (page == 0) {
                     WordsPage(
@@ -171,10 +183,11 @@ private fun WordCounterApp(viewModel: MainViewModel = viewModel()) {
                 } else {
                     SettingsPage(
                         apiKeyInput = uiState.apiKeyInput,
-                        maskedApiKey = viewModel.maskedApiKey(),
+                        definitionLanguage = uiState.definitionLanguage,
                         isBusy = uiState.isBusy,
                         errorText = uiState.errorText,
                         onApiKeyChange = viewModel::onApiKeyInputChange,
+                        onDefinitionLanguageChange = viewModel::onDefinitionLanguageChange,
                         onSave = viewModel::saveApiKey,
                         onRemove = viewModel::removeApiKey,
                         modifier = Modifier.weight(1f),
@@ -186,13 +199,34 @@ private fun WordCounterApp(viewModel: MainViewModel = viewModel()) {
 }
 
 @Composable
-private fun ScrollHeaderTitle() {
+private fun ScrollHeaderTitle(modifier: Modifier = Modifier) {
     Text(
         text = "Bloom Lexicon",
         style = MaterialTheme.typography.headlineMedium,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(horizontal = 4.dp),
+        modifier = modifier.padding(horizontal = 4.dp),
     )
+}
+
+@Composable
+private fun TopHeader(
+    pageSwitcherVisible: Boolean,
+    onTogglePageSwitcher: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ScrollHeaderTitle(modifier = Modifier.weight(1f))
+
+        OutlinedButton(
+            onClick = onTogglePageSwitcher,
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+        ) {
+            Text(if (pageSwitcherVisible) "Close" else "Menu")
+        }
+    }
 }
 
 @Composable
@@ -275,6 +309,7 @@ private fun WordsPage(
 ) {
     var editTarget by remember { mutableStateOf<WordEntity?>(null) }
     var expandedRowId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var filtersExpanded by rememberSaveable { mutableStateOf(false) }
     val sortOptions = listOf(SortMethod.OCCURRENCE, SortMethod.ALPHABETICAL, SortMethod.ADDED_DATE)
 
     LazyColumn(
@@ -283,25 +318,12 @@ private fun WordsPage(
         contentPadding = PaddingValues(bottom = 6.dp),
     ) {
         item {
-            ScrollHeaderTitle()
-        }
-
-        item {
             SoftCard {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = if (needsDefinitionStep) "Phase 2: Add Meaning" else "Phase 1: Add Word",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = if (needsDefinitionStep) {
-                            "This word is new. Add meaning or use GPT definition, then save."
-                        } else {
-                            "Enter a word first. Existing words increase count automatically."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
 
                     OutlinedTextField(
@@ -329,7 +351,7 @@ private fun WordsPage(
                                 enabled = !isBusy,
                                 shape = RoundedCornerShape(14.dp),
                             ) {
-                                Text(if (isBusy) "Working..." else "GPT Definition")
+                                Text(if (isBusy) "Working..." else "Get Definition")
                             }
                             Button(
                                 onClick = onAdd,
@@ -349,11 +371,6 @@ private fun WordsPage(
                                 Text(if (isBusy) "Working..." else "Check / Add")
                             }
                         }
-                        Text(
-                            text = "If the word already exists, occurrence will increase automatically.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
 
                     if (errorText.isNotBlank()) {
@@ -370,23 +387,43 @@ private fun WordsPage(
         item {
             SoftCard {
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Text("Filters", style = MaterialTheme.typography.titleSmall)
-                    DropdownSelector(
-                        label = "Sort type",
-                        selectedText = sortMethodLabel(sortMethod),
-                        options = sortOptions.map(::sortMethodLabel),
-                        enabled = !isBusy,
-                        onOptionSelected = { index -> onSortMethodChange(sortOptions[index]) },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                    )
-                    DropdownSelector(
-                        label = "Order",
-                        selectedText = if (sortAscending) "Ascending" else "Descending",
-                        options = listOf("Descending", "Ascending"),
-                        enabled = !isBusy,
-                        onOptionSelected = { index -> onSortDirectionChange(index == 1) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Filters",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                        OutlinedButton(
+                            onClick = { filtersExpanded = !filtersExpanded },
+                            enabled = !isBusy,
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                        ) {
+                            Text(if (filtersExpanded) "Hide" else "Show")
+                        }
+                    }
+
+                    if (filtersExpanded) {
+                        DropdownSelector(
+                            label = "Sort type",
+                            selectedText = sortMethodLabel(sortMethod),
+                            options = sortOptions.map(::sortMethodLabel),
+                            enabled = !isBusy,
+                            onOptionSelected = { index -> onSortMethodChange(sortOptions[index]) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        DropdownSelector(
+                            label = "Order",
+                            selectedText = if (sortAscending) "Ascending" else "Descending",
+                            options = listOf("Descending", "Ascending"),
+                            enabled = !isBusy,
+                            onOptionSelected = { index -> onSortDirectionChange(index == 1) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
             }
         }
@@ -402,21 +439,6 @@ private fun WordsPage(
                 }
             }
         } else {
-            item {
-                SoftCard(contentPadding = PaddingValues(12.dp)) {
-                    Text(
-                        text = "Saved words",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = "Tap Show to open meaning and actions.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
             items(words, key = { it.id }) { entry ->
                 WordTableRow(
                     entry = entry,
@@ -696,10 +718,11 @@ private fun EditDialog(
 @Composable
 private fun SettingsPage(
     apiKeyInput: String,
-    maskedApiKey: String,
+    definitionLanguage: DefinitionLanguage,
     isBusy: Boolean,
     errorText: String,
     onApiKeyChange: (String) -> Unit,
+    onDefinitionLanguageChange: (DefinitionLanguage) -> Unit,
     onSave: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
@@ -712,21 +735,9 @@ private fun SettingsPage(
             .verticalScroll(scroll),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ScrollHeaderTitle()
-
         SoftCard {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("AI Settings", style = MaterialTheme.typography.titleLarge)
-                Text(
-                    "Current key: $maskedApiKey",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    "Model: gpt-4.1-mini",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
 
                 OutlinedTextField(
                     value = apiKeyInput,
@@ -754,6 +765,26 @@ private fun SettingsPage(
                     }
                 }
 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    LanguageOptionButton(
+                        label = "English",
+                        selected = definitionLanguage == DefinitionLanguage.ENGLISH,
+                        enabled = !isBusy,
+                        onClick = { onDefinitionLanguageChange(DefinitionLanguage.ENGLISH) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    LanguageOptionButton(
+                        label = "Arabic",
+                        selected = definitionLanguage == DefinitionLanguage.ARABIC,
+                        enabled = !isBusy,
+                        onClick = { onDefinitionLanguageChange(DefinitionLanguage.ARABIC) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
                 if (errorText.isNotBlank()) {
                     Text(
                         errorText,
@@ -763,14 +794,34 @@ private fun SettingsPage(
                 }
             }
         }
+    }
+}
 
-        SoftCard {
-            Text("Tips", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Keep your API key private and rotate it regularly. You can still add and edit words without AI definitions.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+@Composable
+private fun LanguageOptionButton(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (selected) {
+        Button(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = modifier,
+            shape = RoundedCornerShape(12.dp),
+        ) {
+            Text(label)
+        }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = modifier,
+            shape = RoundedCornerShape(12.dp),
+        ) {
+            Text(label)
         }
     }
 }

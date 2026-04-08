@@ -11,7 +11,7 @@ object OpenAiClient {
     private const val OPENAI_URL = "https://api.openai.com/v1/responses"
     private const val MODEL = "gpt-4.1-mini"
 
-    fun generateDefinition(word: String, apiKey: String): String {
+    fun generateDefinition(word: String, apiKey: String, secondaryLanguage: String): String {
         val payload = JSONObject().apply {
             put("model", MODEL)
             put(
@@ -30,7 +30,7 @@ object OpenAiClient {
                                 "content",
                                 "Define the German word \"$word\". Return exactly in this format with no extra text:\n" +
                                     "German:\n<1-2 concise sentences in German>\n\n" +
-                                    "English:\n<1-2 concise sentences in English>",
+                                    "$secondaryLanguage:\n<1-2 concise sentences in $secondaryLanguage>",
                             )
                         }
                     )

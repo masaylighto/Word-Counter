@@ -26,10 +26,23 @@ enum class SortMethod {
     ADDED_DATE,
 }
 
+enum class DefinitionLanguage(val preferenceValue: String, val label: String) {
+    ENGLISH("english", "English"),
+    ARABIC("arabic", "Arabic");
+
+    companion object {
+        fun fromPreference(value: String): DefinitionLanguage {
+            val normalized = value.trim().lowercase(Locale.ROOT)
+            return entries.firstOrNull { it.preferenceValue == normalized } ?: ENGLISH
+        }
+    }
+}
+
 data class UiState(
     val wordInput: String = "",
     val meaningInput: String = "",
     val apiKeyInput: String = "",
+    val definitionLanguage: DefinitionLanguage = DefinitionLanguage.ENGLISH,
     val statusText: String = "Ready",
     val errorText: String = "",
     val isBusy: Boolean = false,
@@ -41,8 +54,14 @@ data class UiState(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = WordRepository(AppDatabase.get(application).wordDao())
     private val settingsStore = SettingsStore(application)
+    private val initialDefinitionLanguage = DefinitionLanguage.fromPreference(settingsStore.loadDefinitionLanguage())
 
-    private val _uiState = MutableStateFlow(UiState(apiKeyInput = settingsStore.loadApiKey()))
+    private val _uiState = MutableStateFlow(
+        UiState(
+            apiKeyInput = settingsStore.loadApiKey(),
+            definitionLanguage = initialDefinitionLanguage,
+        ),
+    )
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     private val sourceWords = repository.observeWords().stateIn(
@@ -87,6 +106,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(apiKeyInput = value)
     }
 
+    fun onDefinitionLanguageChange(language: DefinitionLanguage) {
+        settingsStore.saveDefinitionLanguage(language.preferenceValue)
+        _uiState.value = _uiState.value.copy(definitionLanguage = language)
+    }
+
     fun onSortMethodChange(method: SortMethod) {
         _uiState.value = _uiState.value.copy(sortMethod = method)
     }
@@ -129,7 +153,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = _uiState.value.copy(
                     needsDefinitionStep = true,
                     errorText = "",
-                    statusText = "\"$word\" is new. Add meaning or tap Get Definition, then press Add Word.",
+                    statusText = "\"$word\" is new. Add meaning or tap Get Definition, then press Save Word.",
                 )
                 return@launchBusyTask
             }
@@ -159,6 +183,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun generateDefinition() {
         val word = _uiState.value.wordInput.trim()
         val apiKey = _uiState.value.apiKeyInput.trim()
+        val language = _uiState.value.definitionLanguage.label
 
         if (word.isEmpty()) {
             setError("Enter a German word first.")
@@ -172,7 +197,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         launchBusyTask {
             val definition = withContext(Dispatchers.IO) {
-                OpenAiClient.generateDefinition(word, apiKey)
+                OpenAiClient.generateDefinition(word, apiKey, language)
             }
             _uiState.value = _uiState.value.copy(
                 meaningInput = definition,
@@ -242,13 +267,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorText = "")
-    }
-
-    fun maskedApiKey(): String {
-        val key = _uiState.value.apiKeyInput.trim()
-        if (key.isEmpty()) return "Not set"
-        if (key.length <= 10) return "Saved"
-        return "${key.take(7)}...${key.takeLast(4)}"
     }
 
     private fun launchBusyTask(task: suspend () -> Unit) {

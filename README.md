@@ -1,6 +1,6 @@
-﻿# Native Kotlin + Room Word Counter
-
-This project is now a native Android app built with Kotlin, Jetpack Compose, and Room.
+﻿# Native Kotlin + Room Word Counter + Built entierly with AI, 
+Personal Project, Build With ai (didnt read the code, its personal nothing production ready)
+This project is now a native Android app built with Kotlin, Jetpack Compose, and Room. 
 
 ## Build debug APK
 
